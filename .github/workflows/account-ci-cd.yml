@@ -1,0 +1,70 @@
+name: CI-CD Account Service
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  build-scan-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: account-service
+      IMAGE_OWNER: devbyasobie
+      REGISTRY: ghcr.io
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build with Maven
+        working-directory: services/account-service
+        run: mvn -B clean package -DskipTests
+
+      # build the Docker image for your service
+      - name: Build Docker image
+        working-directory: services/account-service
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+
+      # login to GitHub Container Registry using GitHub Actions token
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u $GITHUB_ACTOR --password-stdin
+
+      # push image to ghcr.io/devbyasobie/account-service:<sha>
+      - name: Push image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      # install kubectl
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      # write kubeconfig from secret
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      # deploy to your cluster (minikube right now)
+      - name: Deploy to Kubernetes
+        run: |
+          # make sure namespace exists
+          kubectl get ns tax-modernization || kubectl create ns tax-modernization
+
+          # swap in the real image name and apply
+          sed "s|IMAGE_PLACEHOLDER|${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g" infra/k8s/account-deployment.yaml | kubectl apply -f -
+          kubectl apply -f infra/k8s/account-service.yaml
+
+          # wait for rollout
+          kubectl rollout status deploy/account-service -n tax-modernization

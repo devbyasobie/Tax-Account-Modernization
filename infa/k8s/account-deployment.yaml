@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: account-service
-          image: account-service:v2
+          image: IMAGE_PLACEHOLDER
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082
