@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  taxpayer-service:
+    build: ./taxpayer-service
+    container_name: taxpayer-service
+    ports:
+    - "8081:8081"
+
+  account-service:
+    build: ./account-service
+    container_name: account-service
+    ports:
+      - "8082:8082"
+
+    depends_on:
+      - taxpayer-service
