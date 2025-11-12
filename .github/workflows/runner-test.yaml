@@ -1,0 +1,22 @@
+name: Runner Sanity Check
+
+on:
+  workflow_dispatch:    # lets you run it manually
+
+jobs:
+  show-env:
+    runs-on: self-hosted   # use your new runner
+    steps:
+      - name: Who am I
+        run: |
+          echo "user: $(whoami)"
+          echo "home: $HOME"
+          pwd
+          uname -a
+          ls -R /Users/flyboytroy/.minikube | head -50 || true
+      - name: Check kubectl
+        run: |
+          kubectl get pods -A || true
+      - name: Check minikube
+        run: |
+          minikube status || true
