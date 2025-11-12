@@ -49,10 +49,12 @@ jobs:
       - name: Copy kube + minikube
         run: |
           mkdir -p $HOME/.kube
-          cp /Users/flyboytroy/.kube/config $HOME/.kube/config
+          if [ ! -f $HOME/.kube/config ]; then  
+            cp /Users/flyboytroy/.kube/config $HOME/.kube/config
+          fi 
           mkdir -p $HOME/.minikube
-          cp -R /Users/flyboytroy/.minikube/* $HOME/.minikube/
-
+          cp -R /Users/flyboytroy/.minikube/* $HOME/.minikube/ || true
+          
       - name: Deploy to Kubernetes (local minikube)
         run: |
           kubectl get ns tax-modernization || kubectl create ns tax-modernization
