@@ -54,14 +54,13 @@ jobs:
           fi 
           mkdir -p $HOME/.minikube
           cp -R /Users/flyboytroy/.minikube/* $HOME/.minikube/ || true
-          
+
       - name: Deploy to Kubernetes (local minikube)
         run: |
           kubectl get ns tax-modernization || kubectl create ns tax-modernization
 
-          sed "s|IMAGE_PLACEHOLDER|${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g" infra/k8s/account-deployment.yaml \
-            | kubectl apply -f -
-
-          kubectl apply -f infra/k8s/account-deployment.yaml
+          RENDERED="$(sed "s|IMAGE_PLACEHOLDER|${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g" infra/k8s/account-deployment.yaml)"
+          echo "$RENDERED" | grep -q 'IMAGE_PLACEHOLDER' && { echo "❌ Placeholder not replaced"; exit 1; }
+          echo "$RENDERED" | kubectl apply -f -
 
           kubectl rollout status deploy/account-service -n tax-modernization
