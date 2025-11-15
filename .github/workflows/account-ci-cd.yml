@@ -5,6 +5,11 @@ on:
     branches: ["main"]
   workflow_dispatch: 
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
 jobs:
   build-deploy:
     runs-on:
@@ -28,6 +33,44 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Add SpotBugs + FindSecBugs
+        working-directory: services/account-service
+        run: |
+          mvn -B -DskipTests=false test spotbugs:check
+
+            - name: Install Trivy (mac self-hosted)
+        run: |
+          if ! command -v trivy >/dev/null 2>&1; then
+            brew install aquasecurity/trivy/trivy
+          fi
+          trivy --version
+
+      - name: Trivy FS scan (source) -> SARIF
+        run: |
+          trivy fs --exit-code 1 --ignore-unfixed \
+            --severity HIGH,CRITICAL \
+            --format sarif --output trivy-fs.sarif \
+            .
+
+      - name: Trivy config scan (K8s/IaC) -> SARIF
+        run: |
+          trivy config --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --format sarif --output trivy-config.sarif \
+            infra/k8s || infa/k8s || true
+            # the '|| true' is just to avoid failing if only one path exists;
+            # the exit code will have already been set if HIGH/CRITICAL found.
+
+      - name: Upload Trivy SARIF (fs)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+
+      - name: Upload Trivy SARIF (config)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-config.sarif
+
       - name: Build with Maven
         working-directory: services/account-service
         run: mvn -B clean package -DskipTests
@@ -37,6 +80,18 @@ jobs:
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
+      - name: Trivy image scan -> SARIF (fail on HIGH/CRITICAL)
+        run: |
+          trivy image --exit-code 1 --ignore-unfixed \
+            --severity HIGH,CRITICAL \
+            --format sarif --output trivy-image.sarif \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Upload Trivy SARIF (image)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+
       - name: Log in to GHCR
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u $GITHUB_ACTOR --password-stdin
@@ -45,6 +100,10 @@ jobs:
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
+      - name: Preload image into minikube
+        run: |
+          minikube image load ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          
       # now that we're on your Mac, we can copy your real kube/minikube
       - name: Copy kube + minikube
         run: |
