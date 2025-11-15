@@ -38,7 +38,7 @@ jobs:
         run: |
           mvn -B -DskipTests=false test spotbugs:check
 
-            - name: Install Trivy (mac self-hosted)
+      - name: Install Trivy (mac self-hosted)
         run: |
           if ! command -v trivy >/dev/null 2>&1; then
             brew install aquasecurity/trivy/trivy
@@ -103,7 +103,7 @@ jobs:
       - name: Preload image into minikube
         run: |
           minikube image load ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          
+
       # now that we're on your Mac, we can copy your real kube/minikube
       - name: Copy kube + minikube
         run: |
