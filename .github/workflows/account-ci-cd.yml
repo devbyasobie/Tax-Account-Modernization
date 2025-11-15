@@ -62,14 +62,16 @@ jobs:
             # the exit code will have already been set if HIGH/CRITICAL found.
 
       - name: Upload Trivy SARIF (fs)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs.sarif
+          category: trivy-fs
 
       - name: Upload Trivy SARIF (config)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-config.sarif
+          category: trivy-config
 
       - name: Build with Maven
         working-directory: services/account-service
@@ -88,9 +90,10 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Upload Trivy SARIF (image)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif
+          category: trivy-image
 
       - name: Log in to GHCR
         run: |
